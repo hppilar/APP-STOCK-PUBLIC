@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepósitoStock — Control de Inventario</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════
+   TOKENS
+═══════════════════════════════════ */
+:root {
+  --bg:      #0c0c0c;
+  --s1:      #161616;
+  --s2:      #1e1e1e;
+  --s3:      #272727;
+  --border:  #2e2e2e;
+  --border2: #3a3a3a;
+  --accent:  #e8ff47;
+  --acd:     #c8df30;
+  --green:   #47ffb2;
+  --red:     #ff5757;
+  --orange:  #ffaa47;
+  --blue:    #57b8ff;
+  --text:    #efefef;
+  --t2:      #999;
+  --t3:      #555;
+  --t4:      #333;
+  --r:       5px;
+  --mono:    'DM Mono', monospace;
+  --sans:    'DM Sans', sans-serif;
+  --disp:    'Bebas Neue', sans-serif;
+  --tr:      all .18s ease;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased;}
+button{cursor:pointer;font-family:var(--sans);}
+input,textarea{font-family:var(--sans);}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);}
+
+/* ═══════════════════════════════════
+   SCREENS
+═══════════════════════════════════ */
+.screen{display:none;}
+.screen.active{display:flex;}
+
+/* ─── LOGIN ─── */
+#screenLogin{flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+.login-bg{position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 60% 40% at 20% 50%,rgba(232,255,71,.05) 0%,transparent 70%),
+             radial-gradient(ellipse 40% 60% at 80% 50%,rgba(71,255,178,.03) 0%,transparent 70%);}
+.login-wrap{position:relative;z-index:1;width:100%;max-width:400px;display:flex;flex-direction:column;gap:20px;}
+.login-logo{font-family:var(--disp);font-size:52px;letter-spacing:4px;line-height:.95;color:var(--accent);text-align:center;}
+.login-logo .sub{display:block;font-family:var(--mono);font-size:10px;letter-spacing:5px;color:var(--t2);margin-top:6px;}
+.login-card{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:28px;
+  display:flex;flex-direction:column;gap:14px;}
+.card-title{font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:3px;}
+.fgroup{display:flex;flex-direction:column;gap:5px;}
+.flabel{font-family:var(--mono);font-size:10px;color:var(--t2);text-transform:uppercase;letter-spacing:2px;}
+.finput{padding:12px 14px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);
+  color:var(--text);font-size:14px;outline:none;transition:var(--tr);width:100%;}
+.finput:focus{border-color:var(--accent);}
+.finput::placeholder{color:var(--t3);font-size:12px;}
+.btn-login{padding:14px;background:var(--accent);border:none;border-radius:var(--r);color:#0c0c0c;
+  font-family:var(--disp);font-size:22px;letter-spacing:2px;transition:var(--tr);width:100%;
+  display:flex;align-items:center;justify-content:center;gap:10px;}
+.btn-login:hover:not(:disabled){background:var(--acd);transform:translateY(-1px);}
+.btn-login:disabled{background:var(--s3);color:var(--t3);cursor:not-allowed;}
+.login-err{font-family:var(--mono);font-size:11px;color:var(--red);text-align:center;min-height:16px;}
+
+/* ─── LOADING ─── */
+#screenLoading{flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;}
+.loading-logo{font-family:var(--disp);font-size:42px;letter-spacing:4px;color:var(--accent);}
+.loading-bar-w{width:280px;height:2px;background:var(--s3);border-radius:2px;overflow:hidden;}
+.loading-bar{height:100%;background:var(--accent);width:0;transition:width .4s ease;}
+.loading-msg{font-family:var(--mono);font-size:11px;color:var(--t2);min-height:16px;text-align:center;}
+
+/* ─── APP ─── */
+#screenApp{flex-direction:column;height:100vh;overflow:hidden;}
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;
+  background:var(--s1);border-bottom:1px solid var(--border);flex-shrink:0;}
+.app-logo{font-family:var(--disp);font-size:24px;letter-spacing:2px;color:var(--accent);}
+.app-logo span{color:var(--t3);}
+.hchip{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:20px;
+  background:var(--s3);border:1px solid var(--border);color:var(--t2);}
+.hchip.green{color:var(--green);border-color:rgba(71,255,178,.2);}
+.hright{display:flex;gap:8px;align-items:center;}
+.btn-sm{padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:var(--r);
+  color:var(--t2);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;transition:var(--tr);}
+.btn-sm:hover{border-color:var(--t2);color:var(--text);}
+.btn-sm.danger:hover{border-color:var(--red);color:var(--red);}
+
+.app-body{display:grid;grid-template-columns:1fr 320px;flex:1;overflow:hidden;}
+
+/* ─── PANEL LEFT ─── */
+.panel-left{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;}
+.tabs{display:flex;background:var(--s1);border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab-btn{flex:1;padding:13px 8px;background:transparent;border:none;border-bottom:2px solid transparent;
+  color:var(--t3);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;
+  transition:var(--tr);display:flex;align-items:center;justify-content:center;gap:6px;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-btn:hover:not(.active){color:var(--text);}
+.tab-panel{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.tab-panel.active{display:flex;}
+
+/* ─── SCANNER TAB ─── */
+.scanner-zone{padding:24px 20px 14px;flex-shrink:0;}
+.scan-label{font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:3px;
+  margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.blink{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 2s infinite;flex-shrink:0;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.scan-wrap{position:relative;}
+.scan-input{width:100%;padding:16px 52px 16px 16px;background:var(--s2);border:2px solid var(--border);
+  border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:20px;letter-spacing:2px;
+  outline:none;transition:var(--tr);}
+.scan-input:focus{border-color:var(--accent);}
+.scan-input::placeholder{font-size:13px;letter-spacing:0;color:var(--t3);}
+.scan-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none;opacity:.4;}
+
+/* ─── INACTIVE ALERT ─── */
+.inactive-alert{margin:0 20px 10px;padding:10px 14px;background:rgba(255,170,71,.08);
+  border:1px solid rgba(255,170,71,.35);border-radius:var(--r);
+  font-family:var(--mono);font-size:11px;color:var(--orange);
+  display:none;align-items:center;gap:8px;flex-shrink:0;}
+.inactive-alert.visible{display:flex;}
+
+/* ─── PRODUCT CARD ─── */
+.pf{margin:0 20px 16px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;display:none;animation:fadeUp .2s ease;flex-shrink:0;}
+.pf.visible{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.pf-inner{display:flex;}
+.pf-img{width:110px;height:110px;flex-shrink:0;background:var(--s3);
+  display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;}
+.pf-img img{width:100%;height:100%;object-fit:cover;display:block;}
+.pf-body{flex:1;padding:12px 14px;min-width:0;}
+.pf-name{font-size:15px;font-weight:600;margin-bottom:6px;line-height:1.2;}
+.pf-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;}
+.pf-tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;
+  background:var(--s3);border:1px solid var(--border);color:var(--t2);}
+.pf-tag.code{color:var(--accent);border-color:rgba(232,255,71,.2);}
+.qty-row{display:flex;gap:8px;align-items:center;}
+.qty-input{width:72px;padding:9px;background:var(--s3);border:2px solid var(--border);border-radius:var(--r);
+  color:var(--text);font-family:var(--mono);font-size:18px;font-weight:500;text-align:center;outline:none;transition:var(--tr);}
+.qty-input:focus{border-color:var(--accent);}
+.btn-add{flex:1;padding:9px;background:var(--accent);border:none;border-radius:var(--r);color:#0c0c0c;
+  font-family:var(--disp);font-size:18px;letter-spacing:1px;transition:var(--tr);}
+.btn-add:hover{background:var(--acd);}
+.btn-add:active{transform:scale(.98);}
+.notes-input{width:100%;margin-top:8px;padding:7px 10px;height:46px;background:var(--s3);
+  border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:12px;
+  resize:none;outline:none;transition:var(--tr);}
+.notes-input:focus{border-color:var(--border2);}
+.notes-input::placeholder{color:var(--t3);font-size:11px;}
+
+/* ─── SEARCH TAB ─── */
+.search-zone{padding:14px 16px;border-bottom:1px solid var(--border);
+  display:flex;flex-direction:column;gap:7px;flex-shrink:0;}
+.srow{display:flex;gap:7px;}
+.sinput{flex:1;padding:9px 12px;background:var(--s2);border:1px solid var(--border);
+  border-radius:var(--r);color:var(--text);font-size:13px;outline:none;transition:var(--tr);}
+.sinput:focus{border-color:var(--accent);}
+.sinput::placeholder{color:var(--t3);font-size:12px;}
+.search-results{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.s-idle{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;color:var(--t3);font-family:var(--mono);font-size:11px;text-align:center;line-height:1.8;padding:32px;}
+.s-idle-icon{font-size:36px;opacity:.4;}
+.ri{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--s2);
+  border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:var(--tr);}
+.ri:hover{background:var(--s3);border-color:var(--accent);}
+.ri-thumb{width:44px;height:44px;flex-shrink:0;border-radius:4px;overflow:hidden;
+  background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:18px;}
+.ri-thumb img{width:100%;height:100%;object-fit:cover;display:none;}
+.ri-thumb img.loaded{display:block;}
+.ri-info{flex:1;min-width:0;}
+.ri-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+.ri-meta{font-family:var(--mono);font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ri-arrow{color:var(--t3);flex-shrink:0;font-size:12px;}
+.s-count{font-family:var(--mono);font-size:10px;color:var(--t3);text-align:center;padding:4px;}
+
+/* ─── RIGHT PANEL ─── */
+.panel-right{display:flex;flex-direction:column;background:var(--s1);overflow:hidden;}
+.pr-head{padding:14px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.pr-title{font-family:var(--disp);font-size:20px;letter-spacing:1px;color:var(--accent);}
+.pr-count{font-family:var(--mono);font-size:11px;background:var(--accent);color:#0c0c0c;
+  padding:2px 9px;border-radius:20px;font-weight:600;}
+.session-list{flex:1;overflow-y:auto;padding:8px;}
+.s-empty{padding:40px 16px;text-align:center;color:var(--t3);font-family:var(--mono);font-size:11px;line-height:1.9;}
+.si{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:4px;
+  background:var(--s2);border:1px solid var(--border);border-radius:var(--r);transition:var(--tr);}
+.si:hover{border-color:var(--border2);}
+.si-thumb{width:34px;height:34px;flex-shrink:0;border-radius:3px;overflow:hidden;
+  background:var(--s3);font-size:14px;display:flex;align-items:center;justify-content:center;}
+.si-thumb img{width:100%;height:100%;object-fit:cover;display:none;}
+.si-thumb img.loaded{display:block;}
+.si-info{flex:1;min-width:0;}
+.si-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;}
+.si-code{font-family:var(--mono);font-size:10px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.si-qty{font-family:var(--disp);font-size:22px;color:var(--accent);flex-shrink:0;min-width:30px;text-align:right;}
+.si-del{background:none;border:none;color:var(--t4);font-size:13px;padding:4px;transition:var(--tr);}
+.si-del:hover{color:var(--red);}
+.pr-footer{padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;flex-shrink:0;}
+.pr-sum{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--t2);}
+.pr-sum strong{color:var(--text);}
+.btn-primary{padding:12px;background:var(--accent);border:none;border-radius:var(--r);color:#0c0c0c;
+  font-family:var(--disp);font-size:20px;letter-spacing:1px;transition:var(--tr);width:100%;}
+.btn-primary:hover{background:var(--acd);}
+.btn-secondary{padding:9px;background:transparent;border:1px solid var(--border);border-radius:var(--r);
+  color:var(--t2);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;
+  transition:var(--tr);width:100%;}
+.btn-secondary:hover{border-color:var(--green);color:var(--green);}
+.btn-tertiary{padding:9px;background:transparent;border:1px solid var(--border);border-radius:var(--r);
+  color:var(--t3);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;
+  transition:var(--tr);width:100%;}
+.btn-tertiary:hover{border-color:var(--red);color:var(--red);}
+
+/* ─── MODAL ─── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:800;
+  display:none;align-items:center;justify-content:center;padding:24px;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:28px;
+  width:100%;max-width:400px;animation:fadeUp .2s ease;}
+.modal-title{font-family:var(--disp);font-size:24px;letter-spacing:1px;color:var(--accent);margin-bottom:12px;}
+.modal-body{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.7;}
+.modal-body strong{color:var(--text);}
+.modal-actions{display:flex;gap:8px;}
+.modal-actions .btn-primary,.modal-actions .btn-secondary{font-size:14px;padding:11px;}
+.up-wrap{background:var(--s2);border-radius:var(--r);padding:12px;display:none;flex-direction:column;gap:6px;margin-bottom:16px;}
+.up-wrap.visible{display:flex;}
+.up-label{font-family:var(--mono);font-size:10px;color:var(--t2);}
+.up-bar{height:2px;background:var(--s3);border-radius:2px;overflow:hidden;}
+.up-fill{height:100%;background:var(--accent);width:0;transition:width .3s;}
+.up-msg{font-family:var(--mono);font-size:10px;color:var(--t3);}
+
+/* ─── TOAST ─── */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);
+  background:var(--s3);border:1px solid var(--border);border-radius:var(--r);padding:9px 18px;
+  font-family:var(--mono);font-size:11px;color:var(--text);z-index:2000;opacity:0;
+  transition:all .25s cubic-bezier(.34,1.56,.64,1);display:flex;align-items:center;gap:8px;white-space:nowrap;}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+.tdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+#toast.ok .tdot{background:var(--green);}
+#toast.err .tdot{background:var(--red);}
+#toast.info .tdot{background:var(--blue);}
+#toast.warn .tdot{background:var(--orange);}
+
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(12,12,12,.3);
+  border-top-color:#0c0c0c;border-radius:50%;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="screenLogin" class="screen active">
+  <div class="login-bg"></div>
+  <div class="login-wrap">
+    <div class="login-logo">DEPÓSITO<br>STOCK<span class="sub">CONTROL DE INVENTARIO</span></div>
+    <div class="login-card">
+      <div class="card-title">▸ Iniciar sesión</div>
+      <div class="fgroup">
+        <div class="flabel">Usuario</div>
+        <input id="inUser" class="finput" type="text"
+          placeholder="nombre de usuario"
+          autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Contraseña</div>
+        <input id="inPass" class="finput" type="password"
+          placeholder="••••••••"
+          autocomplete="current-password">
+      </div>
+      <button class="btn-login" id="btnLogin" onclick="doLogin()">INGRESAR</button>
+      <div class="login-err" id="loginErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ LOADING ══════════ -->
+<div id="screenLoading" class="screen">
+  <div class="loading-logo">CARGANDO</div>
+  <div class="loading-bar-w"><div class="loading-bar" id="loadBar"></div></div>
+  <div class="loading-msg" id="loadMsg">Verificando acceso…</div>
+</div>
+
+<!-- ══════════ APP ══════════ -->
+<div id="screenApp" class="screen">
+
+  <header class="app-header">
+    <div class="app-logo">DEPÓSITO<span>STOCK</span></div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="hchip green" id="chipCatalog">0 productos</span>
+      <span class="hchip" id="chipUser">—</span>
+    </div>
+    <div class="hright">
+      <button class="btn-sm" onclick="saveSession()">💾 Guardar</button>
+      <button class="btn-sm danger" onclick="doLogout()">Salir</button>
+    </div>
+  </header>
+
+  <div class="app-body">
+
+    <!-- LEFT -->
+    <div class="panel-left">
+      <div class="tabs">
+        <button class="tab-btn active" id="tabScanner" onclick="switchTab('scanner')">⚡ Escáner / Código</button>
+        <button class="tab-btn" id="tabSearch" onclick="switchTab('search')">🔍 Buscar Producto</button>
+      </div>
+
+      <!-- SCANNER PANEL -->
+      <div class="tab-panel active" id="paneScanner">
+        <div class="scanner-zone">
+          <div class="scan-label"><span class="blink"></span>Código de barras · SKU · Ingreso manual</div>
+          <div class="scan-wrap">
+            <input type="text" id="scanInput" class="scan-input"
+              placeholder="Escanear o escribir código → Enter"
+              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <span class="scan-icon">▐║</span>
+          </div>
+        </div>
+
+        <!-- Alerta producto inactivo -->
+        <div class="inactive-alert" id="inactiveAlert">
+          ⚠ &nbsp;Este producto está marcado como <strong>Inactivo</strong> en el sistema.
+        </div>
+
+        <div class="pf" id="pf">
+          <div class="pf-inner">
+            <div class="pf-img" id="pfImg">📦</div>
+            <div class="pf-body">
+              <div class="pf-name" id="pfName">—</div>
+              <div class="pf-tags" id="pfTags"></div>
+              <div class="qty-row">
+                <input type="number" class="qty-input" id="qtyInput" value="1" min="1" max="9999">
+                <button class="btn-add" onclick="addToSession()">AGREGAR</button>
+              </div>
+              <textarea class="notes-input" id="notesInput" placeholder="Nota opcional…"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEARCH PANEL -->
+      <div class="tab-panel" id="paneSearch">
+        <div class="search-zone">
+          <input type="text" id="sName" class="sinput" placeholder="🔍  Nombre del producto…" oninput="doSearch()">
+          <div class="srow">
+            <input type="text" id="sBrand" class="sinput" placeholder="Marca / Rubro" oninput="doSearch()">
+            <input type="text" id="sSupp"  class="sinput" placeholder="Proveedor"     oninput="doSearch()">
+          </div>
+          <input type="text" id="sSku" class="sinput" placeholder="SKU" oninput="doSearch()">
+        </div>
+        <div class="search-results" id="searchResults">
+          <div class="s-idle">
+            <div class="s-idle-icon">🔍</div>
+            Escribí al menos 2 caracteres para buscar.<br>
+            <span style="color:var(--t4)">Se mostrarán hasta 15 resultados.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="panel-right">
+      <div class="pr-head">
+        <span class="pr-title">SESIÓN</span>
+        <span class="pr-count" id="prCount">0</span>
+      </div>
+      <div class="session-list" id="sessionList">
+        <div class="s-empty">Aún no hay artículos.<br>Escaneá o buscá un producto.</div>
+      </div>
+      <div class="pr-footer">
+        <div class="pr-sum"><span>Artículos distintos</span><strong id="sumItems">0</strong></div>
+        <div class="pr-sum"><span>Unidades totales</span><strong id="sumUnits">0</strong></div>
+        <button class="btn-primary"   onclick="confirmExport()">CERRAR Y EXPORTAR</button>
+        <button class="btn-secondary" onclick="saveSession()">💾  GUARDAR SESIÓN</button>
+        <button class="btn-tertiary"  onclick="confirmClear()">✕  LIMPIAR SESIÓN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL ══════════ -->
+<div class="modal-bg" id="modalBg" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-title" id="mTitle">—</div>
+    <div class="modal-body"  id="mBody">—</div>
+    <div class="up-wrap" id="upWrap">
+      <div class="up-label">Subiendo a GitHub…</div>
+      <div class="up-bar"><div class="up-fill" id="upFill"></div></div>
+      <div class="up-msg"  id="upMsg">Preparando…</div>
+    </div>
+    <div class="modal-actions" id="mActions"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"><span class="tdot"></span><span id="toastMsg"></span></div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   ⚙️  CONFIGURACIÓN — editar antes de desplegar
+   ══════════════════════════════════════════════════════
+
+   ADMIN_PAT   : Personal Access Token del administrador
+                 (scope: repo — acceso de lectura/escritura al repo privado)
+                 Generar en: github.com/settings/tokens/new
+
+   DATA_OWNER  : Usuario/org de GitHub dueño del repo PRIVADO
+   DATA_REPO   : Nombre del repositorio PRIVADO
+   EXCEL_PATH  : Ruta al Excel de catálogo dentro del repo privado
+   USERS_PATH  : Ruta al archivo users.json dentro del repo privado
+   REPORTS_DIR : Carpeta donde se guardarán los reportes
+   BRANCH      : Rama del repo privado
+*/
+const CONFIG = {
+  ADMIN_PAT:   'ghp_REEMPLAZAR_CON_TU_PAT',
+  DATA_OWNER:  'TU_USUARIO_GITHUB',
+  DATA_REPO:   'TU_REPO_PRIVADO',
+  EXCEL_PATH:  'data/catalogo.xlsx',
+  USERS_PATH:  'data/users.json',
+  REPORTS_DIR: 'reportes',
+  BRANCH:      'main',
+};
+
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+let currentUser = null;   // { username, display }
+let products    = [];
+let session     = [];
+let currentP    = null;
+
+/* ══════════════════════════════════════════════════════
+   GITHUB API
+══════════════════════════════════════════════════════ */
+async function ghGet(path) {
+  const r = await fetch(`https://api.github.com/repos/${CONFIG.DATA_OWNER}/${CONFIG.DATA_REPO}/contents/${path}?ref=${CONFIG.BRANCH}`, {
+    headers: {
+      'Authorization': `token ${CONFIG.ADMIN_PAT}`,
+      'Accept': 'application/vnd.github.v3+json',
+    },
+  });
+  if (!r.ok) throw new Error(`GitHub ${r.status}: ${path}`);
+  return r.json();
+}
+
+async function ghPut(path, base64Content, message, sha=null) {
+  const body = { message, content: base64Content, branch: CONFIG.BRANCH };
+  if (sha) body.sha = sha;
+  const r = await fetch(`https://api.github.com/repos/${CONFIG.DATA_OWNER}/${CONFIG.DATA_REPO}/contents/${path}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `token ${CONFIG.ADMIN_PAT}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(()=>({message:r.statusText}));
+    throw new Error(e.message || 'Error al subir');
+  }
+  return r.json();
+}
+
+/* ══════════════════════════════════════════════════════
+   SHA-256 (Web Crypto API — nativo en todos los browsers)
+══════════════════════════════════════════════════════ */
+async function sha256(str) {
+  const buf  = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ══════════════════════════════════════════════════════
+   LOGIN
+══════════════════════════════════════════════════════ */
+['inUser','inPass'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+
+async function doLogin() {
+  const username = document.getElementById('inUser').value.trim().toLowerCase();
+  const password = document.getElementById('inPass').value;
+  const errEl    = document.getElementById('loginErr');
+  const btn      = document.getElementById('btnLogin');
+
+  if (!username || !password) { errEl.textContent = 'Ingresá usuario y contraseña.'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>';
+  errEl.textContent = '';
+
+  try {
+    // 1. Hash the password client-side
+    const hash = await sha256(password);
+
+    // 2. Fetch users.json from private repo
+    setLoad(20, 'Verificando credenciales…');
+    showScreen('loading');
+
+    const fileData = await ghGet(CONFIG.USERS_PATH);
+    const usersRaw = atob(fileData.content.replace(/\n/g,''));
+    const users    = JSON.parse(usersRaw);
+
+    // 3. Find matching user
+    const user = users.find(u => u.username.toLowerCase() === username && u.hash === hash);
+    if (!user) {
+      showScreen('login');
+      errEl.textContent = '✕ Usuario o contraseña incorrectos.';
+      btn.disabled = false;
+      btn.textContent = 'INGRESAR';
+      return;
+    }
+
+    if (user.active === false) {
+      showScreen('login');
+      errEl.textContent = '✕ Tu cuenta está desactivada. Contactá al administrador.';
+      btn.disabled = false;
+      btn.textContent = 'INGRESAR';
+      return;
+    }
+
+    // 4. Auth OK — store session
+    currentUser = { username: user.username, display: user.display || user.username };
+    sessionStorage.setItem('ds_user', JSON.stringify(currentUser));
+
+    // 5. Load catalog
+    await loadCatalog();
+
+  } catch(e) {
+    showScreen('login');
+    errEl.textContent = '✕ Error de conexión: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = 'INGRESAR';
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   LOAD CATALOG
+══════════════════════════════════════════════════════ */
+async function loadCatalog() {
+  try {
+    setLoad(30, 'Descargando catálogo…');
+    const fileData = await ghGet(CONFIG.EXCEL_PATH);
+    const base64   = fileData.content.replace(/\n/g,'');
+
+    setLoad(55, 'Procesando productos…');
+    const binary = atob(base64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const wb  = XLSX.read(bytes, { type:'array' });
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { defval:'' });
+
+    setLoad(80, `Indexando ${raw.length} productos…`);
+
+    /*
+      Columnas utilizadas:
+        Nombre            → nombre para mostrar y buscar
+        SKU               → búsqueda manual por código interno
+        SKU Padre         → búsqueda manual (variantes)
+        Codigo Barras     → búsqueda por escáner (PRIORIDAD)
+        Rubro             → campo "Marca" en filtros
+        Proveedor         → filtro de búsqueda
+        Estado            → alerta solo si es "Inactivo"
+        URL               → imagen del producto
+
+      Columnas ignoradas:
+        SKU CORREGIDO, Sub Rubro, Atributo 1/2, Variante De Atributo 1/2,
+        Codigo Oem, Descripcion, Moneda, Costo Interno, Precio, Iva,
+        Precio Final, Rentabilidad, Stock, Stock Reservado, Stock Disponible,
+        Stock Minimo, Visible En Ventas, Observaciones, CC Compras/Ventas/Mercaderia
+    */
+    products = raw.map(r => ({
+      sku:       String(r['SKU']           || '').trim(),
+      skuPadre:  String(r['SKU Padre']     || '').trim(),
+      barcode:   String(r['Codigo Barras'] || '').trim(),
+      nombre:    String(r['Nombre']        || '').trim(),
+      marca:     String(r['Rubro']         || '').trim(),
+      proveedor: String(r['Proveedor']     || '').trim(),
+      estado:    String(r['Estado']        || '').trim(),
+      imagen:    String(r['URL']           || '').trim(),
+    })).filter(p => p.nombre);
+
+    setLoad(100, `${products.length} productos cargados ✓`);
+
+    // Restore session if saved
+    const saved = sessionStorage.getItem('ds_session');
+    if (saved) { try { session = JSON.parse(saved); } catch(e){} }
+
+    await delay(400);
+    launchApp();
+
+  } catch(e) {
+    showScreen('login');
+    document.getElementById('loginErr').textContent = '✕ Error cargando catálogo: ' + e.message;
+    document.getElementById('btnLogin').disabled = false;
+    document.getElementById('btnLogin').textContent = 'INGRESAR';
+  }
+}
+
+function setLoad(pct, msg) {
+  document.getElementById('loadBar').style.width = pct + '%';
+  document.getElementById('loadMsg').textContent = msg;
+}
+
+function launchApp() {
+  document.getElementById('chipCatalog').textContent = products.length + ' productos';
+  document.getElementById('chipUser').textContent    = currentUser.display;
+  showScreen('app');
+  renderSession();
+  document.getElementById('scanInput').focus();
+}
+
+/* ══════════════════════════════════════════════════════
+   SCREEN / TAB MANAGEMENT
+══════════════════════════════════════════════════════ */
+function showScreen(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen' + n[0].toUpperCase() + n.slice(1)).classList.add('active');
+}
+
+function switchTab(n) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab' + n[0].toUpperCase() + n.slice(1)).classList.add('active');
+  document.getElementById('pane' + n[0].toUpperCase() + n.slice(1)).classList.add('active');
+  if (n === 'scanner') document.getElementById('scanInput').focus();
+}
+
+/* ══════════════════════════════════════════════════════
+   SCANNER & LOOKUP
+   Prioridad: Codigo Barras (exacto) → SKU (exacto)
+══════════════════════════════════════════════════════ */
+(function setupScanner() {
+  const inp = document.getElementById('scanInput');
+
+  document.addEventListener('keydown', e => {
+    if (document.getElementById('screenApp').classList.contains('active') === false) return;
+    const tag = document.activeElement.tagName;
+    if (['INPUT','TEXTAREA'].includes(tag)) return;
+    if (e.ctrlKey || e.altKey || e.metaKey || e.key === 'Tab') return;
+    inp.focus();
+  });
+
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const val = inp.value.trim();
+      if (val) lookupProduct(val);
+      inp.value = '';
+      e.preventDefault();
+    }
+  });
+
+  document.getElementById('qtyInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { addToSession(); e.preventDefault(); }
+  });
+})();
+
+function lookupProduct(code) {
+  if (!products.length) { toast('Catálogo no cargado', 'err'); return; }
+  const c = code.toLowerCase().trim();
+
+  // Priority 1: exact barcode match
+  let found = products.find(p => p.barcode && p.barcode.toLowerCase() === c);
+  // Priority 2: exact SKU match
+  if (!found) found = products.find(p => p.sku && p.sku.toLowerCase() === c);
+  // Priority 3: SKU Padre match
+  if (!found) found = products.find(p => p.skuPadre && p.skuPadre.toLowerCase() === c);
+
+  if (found) {
+    selectProduct(found);
+    beep('ok');
+  } else {
+    toast(`Código no encontrado: ${code}`, 'err');
+    beep('err');
+    shakeInput('scanInput');
+  }
+}
+
+function selectProduct(p) {
+  currentP = p;
+  switchTab('scanner');
+
+  // Inactive alert
+  const alert = document.getElementById('inactiveAlert');
+  if (p.estado && p.estado.toLowerCase() === 'inactivo') {
+    alert.classList.add('visible');
+  } else {
+    alert.classList.remove('visible');
+  }
+
+  document.getElementById('pfName').textContent = p.nombre;
+
+  const tags = document.getElementById('pfTags');
+  tags.innerHTML = '';
+  const addTag = (txt, cls='') => {
+    if (!txt) return;
+    const s = document.createElement('span');
+    s.className = 'pf-tag' + (cls?' '+cls:'');
+    s.textContent = txt;
+    tags.appendChild(s);
+  };
+  if (p.barcode)   addTag('▐ ' + p.barcode, 'code');
+  if (p.sku)       addTag('SKU: ' + p.sku);
+  if (p.marca)     addTag(p.marca);
+  if (p.proveedor) addTag('🏭 ' + p.proveedor);
+
+  const imgDiv = document.getElementById('pfImg');
+  if (p.imagen) {
+    const img = document.createElement('img');
+    img.alt = p.nombre;
+    img.src = p.imagen;
+    img.onerror = () => { imgDiv.innerHTML = '📦'; };
+    imgDiv.innerHTML = '';
+    imgDiv.appendChild(img);
+  } else {
+    imgDiv.innerHTML = '📦';
+  }
+
+  document.getElementById('qtyInput').value   = 1;
+  document.getElementById('notesInput').value = '';
+  document.getElementById('pf').classList.add('visible');
+
+  const qty = document.getElementById('qtyInput');
+  qty.focus(); qty.select();
+}
+
+/* ══════════════════════════════════════════════════════
+   ADD TO SESSION
+══════════════════════════════════════════════════════ */
+function addToSession() {
+  if (!currentP) return;
+  const qty   = Math.max(1, parseInt(document.getElementById('qtyInput').value)||1);
+  const notes = document.getElementById('notesInput').value.trim();
+
+  const existing = session.find(s =>
+    s.product.barcode === currentP.barcode && s.product.sku === currentP.sku
+  );
+  if (existing) {
+    existing.qty += qty;
+    if (notes) existing.notes = notes;
+    toast(`+${qty} sumado → total: ${existing.qty}`, 'ok');
+  } else {
+    session.push({ product: currentP, qty, notes });
+    toast(`${currentP.nombre} ×${qty}`, 'ok');
+  }
+  beep('add');
+  renderSession();
+
+  document.getElementById('pf').classList.remove('visible');
+  document.getElementById('inactiveAlert').classList.remove('visible');
+  document.getElementById('scanInput').value = '';
+  currentP = null;
+  document.getElementById('scanInput').focus();
+}
+
+/* ══════════════════════════════════════════════════════
+   SEARCH
+   Campos: Nombre · Marca (Rubro) · Proveedor · SKU
+══════════════════════════════════════════════════════ */
+let _st = null;
+function doSearch() { clearTimeout(_st); _st = setTimeout(_search, 180); }
+
+function _search() {
+  const name  = document.getElementById('sName').value.trim().toLowerCase();
+  const brand = document.getElementById('sBrand').value.trim().toLowerCase();
+  const supp  = document.getElementById('sSupp').value.trim().toLowerCase();
+  const sku   = document.getElementById('sSku').value.trim().toLowerCase();
+
+  const hasQ = name.length>=2 || brand.length>=2 || supp.length>=2 || sku.length>=2;
+  const box  = document.getElementById('searchResults');
+
+  if (!hasQ) {
+    box.innerHTML = `<div class="s-idle"><div class="s-idle-icon">🔍</div>
+      Escribí al menos 2 caracteres para buscar.<br>
+      <span style="color:var(--t4)">Se mostrarán hasta 15 resultados.</span></div>`;
+    return;
+  }
+
+  const results = products.filter(p =>
+    (!name  || p.nombre.toLowerCase().includes(name)) &&
+    (!brand || p.marca.toLowerCase().includes(brand)) &&
+    (!supp  || p.proveedor.toLowerCase().includes(supp)) &&
+    (!sku   || p.sku.toLowerCase().includes(sku) || p.skuPadre.toLowerCase().includes(sku))
+  );
+
+  if (!results.length) {
+    box.innerHTML = `<div class="s-idle"><div class="s-idle-icon">🚫</div>Sin resultados</div>`;
+    return;
+  }
+
+  const MAX = 15;
+  const slice = results.slice(0, MAX);
+  box._data = slice;
+
+  box.innerHTML = slice.map((p, i) => {
+    const meta = [p.sku, p.marca, p.proveedor].filter(Boolean).join(' · ');
+    const imgAttr = p.imagen
+      ? `<img data-src="${esc(p.imagen)}" alt="" onerror="this.style.display='none'">`
+      : '📦';
+    return `<div class="ri" onclick="pickSearch(${i})">
+      <div class="ri-thumb">${imgAttr}</div>
+      <div class="ri-info">
+        <div class="ri-name">${esc(p.nombre)}</div>
+        <div class="ri-meta">${esc(meta)}</div>
+      </div>
+      <span class="ri-arrow">›</span>
+    </div>`;
+  }).join('');
+
+  if (results.length > MAX)
+    box.innerHTML += `<div class="s-count">Mostrando ${MAX} de ${results.length} — refiná la búsqueda</div>`;
+
+  // Lazy load
+  box.querySelectorAll('img[data-src]').forEach(img => {
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        const im = e.target;
+        im.src = im.dataset.src;
+        im.removeAttribute('data-src');
+        im.onload = () => im.classList.add('loaded');
+        obs.unobserve(im);
+      });
+    }, { rootMargin:'60px' });
+    obs.observe(img);
+  });
+}
+
+function pickSearch(i) {
+  const box = document.getElementById('searchResults');
+  const p = box._data && box._data[i];
+  if (p) selectProduct(p);
+}
+
+/* ══════════════════════════════════════════════════════
+   SESSION RENDER
+══════════════════════════════════════════════════════ */
+function renderSession() {
+  const list  = document.getElementById('sessionList');
+  const total = session.reduce((s,i)=>s+i.qty, 0);
+  document.getElementById('prCount').textContent  = session.length;
+  document.getElementById('sumItems').textContent = session.length;
+  document.getElementById('sumUnits').textContent = total;
+
+  if (!session.length) {
+    list.innerHTML = '<div class="s-empty">Aún no hay artículos.<br>Escaneá o buscá un producto.</div>';
+    return;
+  }
+
+  list.innerHTML = session.map((item,i) => `
+    <div class="si">
+      <div class="si-thumb">
+        ${item.product.imagen
+          ? `<img src="${esc(item.product.imagen)}" loading="lazy"
+               onerror="this.style.display='none'" onload="this.classList.add('loaded')">`
+          : '📦'}
+      </div>
+      <div class="si-info">
+        <div class="si-name">${esc(item.product.nombre)}</div>
+        <div class="si-code">${esc(item.product.barcode||item.product.sku)}${item.notes?' · '+esc(item.notes):''}</div>
+      </div>
+      <div class="si-qty">${item.qty}</div>
+      <button class="si-del" onclick="removeItem(${i})" title="Eliminar">✕</button>
+    </div>`).join('');
+}
+
+function removeItem(i) {
+  const n = session[i].product.nombre;
+  session.splice(i,1);
+  renderSession();
+  toast(n + ' eliminado', 'info');
+}
+
+/* ══════════════════════════════════════════════════════
+   SAVE SESSION
+══════════════════════════════════════════════════════ */
+function saveSession() {
+  sessionStorage.setItem('ds_session', JSON.stringify(session));
+  toast('Sesión guardada', 'ok');
+}
+
+/* ══════════════════════════════════════════════════════
+   EXPORT TO GITHUB
+══════════════════════════════════════════════════════ */
+function confirmExport() {
+  if (!session.length) { toast('No hay datos para exportar', 'err'); return; }
+  const units = session.reduce((s,i)=>s+i.qty,0);
+  showModal(
+    'CERRAR Y EXPORTAR',
+    `Se generará un reporte con <strong>${session.length}</strong> artículos y <strong>${units}</strong> unidades, y se subirá al repositorio.`,
+    [
+      { label:'Cancelar', primary:false, action:closeModal },
+      { label:'Exportar', primary:true,  action:doExport  },
+    ]
+  );
+}
+
+async function doExport() {
+  document.getElementById('upWrap').classList.add('visible');
+  document.getElementById('mActions').style.opacity = '.35';
+  document.getElementById('mActions').style.pointerEvents = 'none';
+
+  try {
+    setUp(10, 'Generando Excel…'); await delay(80);
+
+    const rows = session.map(item => ({
+      'SKU':           item.product.sku,
+      'Codigo Barras': item.product.barcode,
+      'Nombre':        item.product.nombre,
+      'Rubro':         item.product.marca,
+      'Proveedor':     item.product.proveedor,
+      'Estado':        item.product.estado,
+      'Cantidad':      item.qty,
+      'Notas':         item.notes || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:14},{wch:16},{wch:32},{wch:16},{wch:20},{wch:12},{wch:10},{wch:28}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+    const b64 = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
+
+    setUp(35, 'Preparando commit…'); await delay(80);
+
+    const now   = new Date();
+    const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const fname = `${CONFIG.REPORTS_DIR}/reporte_${stamp}_${currentUser.username}.xlsx`;
+
+    setUp(60, 'Subiendo a GitHub…');
+    let sha = null;
+    try { const ex = await ghGet(fname); sha = ex.sha; } catch(e){}
+
+    setUp(80, 'Commiteando…');
+    await ghPut(fname, b64,
+      `📦 Inventario ${stamp} — ${currentUser.display} (${session.length} arts.)`, sha);
+
+    setUp(100, '¡Listo!'); await delay(500);
+    closeModal();
+
+    session = [];
+    sessionStorage.removeItem('ds_session');
+    renderSession();
+    beep('ok');
+    toast('Reporte subido a GitHub ✓', 'ok');
+
+  } catch(e) {
+    document.getElementById('upWrap').classList.remove('visible');
+    document.getElementById('mActions').style.opacity = '';
+    document.getElementById('mActions').style.pointerEvents = '';
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+function setUp(pct, msg) {
+  document.getElementById('upFill').style.width = pct + '%';
+  document.getElementById('upMsg').textContent  = msg;
+}
+
+function confirmClear() {
+  if (!session.length) return;
+  showModal('LIMPIAR SESIÓN',
+    `Se eliminarán los <strong>${session.length}</strong> artículos cargados. No se puede deshacer.`,
+    [
+      { label:'Cancelar', primary:false, action:closeModal },
+      { label:'Limpiar',  primary:true,  action:() => {
+        session = []; sessionStorage.removeItem('ds_session');
+        renderSession(); closeModal();
+        toast('Sesión limpiada', 'info');
+      }},
+    ]
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   LOGOUT
+══════════════════════════════════════════════════════ */
+function doLogout() {
+  showModal('CERRAR SESIÓN',
+    session.length
+      ? `Tenés <strong>${session.length}</strong> artículos sin exportar. Guardalos antes de salir.`
+      : '¿Cerrar sesión?',
+    [
+      { label:'Cancelar', primary:false, action:closeModal },
+      { label:'Salir',    primary:true,  action:() => {
+        sessionStorage.clear();
+        currentUser=null; products=[]; session=[]; currentP=null;
+        document.getElementById('inUser').value='';
+        document.getElementById('inPass').value='';
+        document.getElementById('loginErr').textContent='';
+        document.getElementById('btnLogin').disabled=false;
+        document.getElementById('btnLogin').textContent='INGRESAR';
+        closeModal();
+        showScreen('login');
+      }},
+    ]
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   MODAL
+══════════════════════════════════════════════════════ */
+function showModal(title, body, buttons) {
+  document.getElementById('mTitle').textContent = title;
+  document.getElementById('mBody').innerHTML    = body;
+  document.getElementById('upWrap').classList.remove('visible');
+  document.getElementById('upFill').style.width = '0';
+  const acts = document.getElementById('mActions');
+  acts.innerHTML = ''; acts.style.opacity=''; acts.style.pointerEvents='';
+  buttons.forEach(b => {
+    const el = document.createElement('button');
+    el.textContent = b.label;
+    el.className   = b.primary ? 'btn-primary' : 'btn-secondary';
+    el.style.flex  = '1';
+    el.onclick     = b.action;
+    acts.appendChild(el);
+  });
+  document.getElementById('modalBg').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modalBg')) return;
+  document.getElementById('modalBg').classList.remove('open');
+}
+
+/* ══════════════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════════════ */
+let _tt;
+function toast(msg, type='info') {
+  const el = document.getElementById('toast');
+  el.className = 'show ' + type;
+  document.getElementById('toastMsg').textContent = msg;
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+/* ══════════════════════════════════════════════════════
+   AUDIO
+══════════════════════════════════════════════════════ */
+let _ac;
+function _ctx(){ return _ac || (_ac = new (window.AudioContext||window.webkitAudioContext)()); }
+function beep(type) {
+  try {
+    const ctx=_ctx(), o=ctx.createOscillator(), g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    if (type==='err') {
+      o.type='sawtooth'; o.frequency.value=180;
+      g.gain.setValueAtTime(.12,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.28);
+      o.start(); o.stop(ctx.currentTime+.28);
+    } else {
+      o.frequency.setValueAtTime(880,ctx.currentTime);
+      o.frequency.setValueAtTime(1320,ctx.currentTime+.06);
+      g.gain.setValueAtTime(.12,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.2);
+      o.start(); o.stop(ctx.currentTime+.2);
+    }
+  } catch(e){}
+}
+
+/* ══════════════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════════════ */
+function shakeInput(id) {
+  const el = document.getElementById(id);
+  el.style.borderColor = 'var(--red)';
+  el.animate([
+    {transform:'translateX(0)'},{transform:'translateX(-5px)'},
+    {transform:'translateX(5px)'},{transform:'translateX(-3px)'},
+    {transform:'translateX(0)'}
+  ], {duration:280});
+  setTimeout(()=>el.style.borderColor='',800);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function pad(n) { return String(n).padStart(2,'0'); }
+function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ══════════════════════════════════════════════════════
+   AUTO-RESTORE ON PAGE RELOAD
+══════════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = sessionStorage.getItem('ds_user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      showScreen('loading');
+      setLoad(5,'Restaurando sesión…');
+      loadCatalog();
+    } catch(e) { sessionStorage.clear(); }
+  }
+});
+</script>
+</body>
+</html>
