@@ -169,14 +169,27 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:var(--tr);}
 .ri:hover{background:var(--s3);border-color:var(--accent);}
 .ri-thumb{width:44px;height:44px;flex-shrink:0;border-radius:4px;overflow:hidden;
-  background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:18px;}
-.ri-thumb img{width:100%;height:100%;object-fit:cover;display:none;}
-.ri-thumb img.loaded{display:block;}
+  background:var(--s3);display:flex;align-items:center;justify-content:center;
+  font-size:18px; position:relative;}
+.ri-thumb-placeholder{position:absolute;font-size:18px;line-height:1;}
+.ri-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity .25s;}
+.ri-thumb img.loaded{opacity:1;}
 .ri-info{flex:1;min-width:0;}
 .ri-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
 .ri-meta{font-family:var(--mono);font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ri-arrow{color:var(--t3);flex-shrink:0;font-size:12px;}
 .s-count{font-family:var(--mono);font-size:10px;color:var(--t3);text-align:center;padding:4px;}
+
+/* Paginacion */
+.s-pagination{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 4px 4px;gap:6px;border-top:1px solid var(--border);margin-top:4px;flex-shrink:0;}
+.s-page-btn{background:transparent;border:1px solid var(--border);border-radius:var(--r);
+  color:var(--t2);font-family:var(--mono);font-size:10px;padding:6px 12px;
+  cursor:pointer;transition:var(--tr);text-transform:uppercase;letter-spacing:1px;}
+.s-page-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.s-page-btn:disabled{opacity:.3;cursor:not-allowed;}
+.s-page-info{font-family:var(--mono);font-size:10px;color:var(--t3);text-align:center;flex:1;}
 
 /* ── RIGHT PANEL ── */
 .panel-right{display:flex;flex-direction:column;background:var(--s1);overflow:hidden;}
@@ -780,6 +793,13 @@ function addToSession() {
    SEARCH
 ══════════════════════════════════════════════════════ */
 let _st = null;
+/* ══════════════════════════════════════════════════════
+   SEARCH — con imagenes lazy + paginacion
+══════════════════════════════════════════════════════ */
+const PAGE_SIZE = 15;
+let searchResults = [];  // todos los resultados del filtro actual
+let searchPage    = 0;   // pagina actual (0-based)
+
 function doSearch() { clearTimeout(_st); _st = setTimeout(_search, 180); }
 
 function _search() {
@@ -791,35 +811,53 @@ function _search() {
   const box   = document.getElementById('searchResults');
 
   if (!hasQ) {
+    searchResults = []; searchPage = 0;
     box.innerHTML = `<div class="s-idle"><div class="s-idle-icon">🔍</div>
       Escribí al menos 2 caracteres para buscar.<br>
-      <span style="color:var(--t4)">Se mostrarán hasta 15 resultados.</span></div>`;
+      <span style="color:var(--t4)">Se mostrarán de a ${PAGE_SIZE} resultados con paginación.</span></div>`;
     return;
   }
 
-  const results = products.filter(p =>
+  searchResults = products.filter(p =>
     (!name  || p.nombre.toLowerCase().includes(name)) &&
     (!brand || p.marca.toLowerCase().includes(brand)) &&
     (!supp  || p.proveedor.toLowerCase().includes(supp)) &&
     (!sku   || p.sku.toLowerCase().includes(sku) || p.skuPadre.toLowerCase().includes(sku))
   );
 
-  if (!results.length) {
+  if (!searchResults.length) {
+    searchPage = 0;
     box.innerHTML = `<div class="s-idle"><div class="s-idle-icon">🚫</div>Sin resultados</div>`;
     return;
   }
 
-  const MAX   = 15;
-  const slice = results.slice(0, MAX);
-  box._data   = slice;
+  searchPage = 0;
+  renderSearchPage();
+}
 
-  box.innerHTML = slice.map((p, i) => {
-    const meta   = [p.sku, p.marca, p.proveedor].filter(Boolean).join(' · ');
-    const imgTag = p.imagen
-      ? `<img data-src="${esc(p.imagen)}" alt="" onerror="this.style.display='none'">`
-      : '📦';
+function renderSearchPage() {
+  const box   = document.getElementById('searchResults');
+  const start = searchPage * PAGE_SIZE;
+  const end   = start + PAGE_SIZE;
+  const slice = searchResults.slice(start, end);
+  const total = searchResults.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  // Guardar datos del slice actual para pickSearch
+  box._data = slice;
+
+  // Items HTML
+  const itemsHTML = slice.map((p, i) => {
+    const meta = [p.sku, p.marca, p.proveedor].filter(Boolean).join(' · ');
+    // Mostrar placeholder emoji mientras carga, imagen encima cuando este lista
+    const imgHTML = p.imagen
+      ? `<span class="ri-thumb-placeholder">📦</span>
+         <img data-src="${esc(p.imagen)}" alt="" 
+              onerror="this.style.display='none'"
+              onload="this.classList.add('loaded');this.previousElementSibling.style.display='none'">`
+      : `<span class="ri-thumb-placeholder">📦</span>`;
     return `<div class="ri" onclick="pickSearch(${i})">
-      <div class="ri-thumb">${imgTag}</div>
+      <div class="ri-thumb">${imgHTML}</div>
       <div class="ri-info">
         <div class="ri-name">${esc(p.nombre)}</div>
         <div class="ri-meta">${esc(meta)}</div>
@@ -828,9 +866,29 @@ function _search() {
     </div>`;
   }).join('');
 
-  if (results.length > MAX)
-    box.innerHTML += `<div class="s-count">Mostrando ${MAX} de ${results.length} — refiná la búsqueda</div>`;
+  // Paginacion HTML
+  const pageInfo = `<div class="s-page-info">
+    ${total} resultado${total!==1?'s':''} — página ${searchPage+1} de ${totalPages}
+  </div>`;
 
+  const prevBtn = searchPage > 0
+    ? `<button class="s-page-btn" onclick="goSearchPage(${searchPage-1})">← Anterior</button>`
+    : `<button class="s-page-btn" disabled>← Anterior</button>`;
+
+  const nextBtn = end < total
+    ? `<button class="s-page-btn" onclick="goSearchPage(${searchPage+1})">Siguiente →</button>`
+    : `<button class="s-page-btn" disabled>Siguiente →</button>`;
+
+  const paginationHTML = totalPages > 1
+    ? `<div class="s-pagination">${prevBtn}${pageInfo}${nextBtn}</div>`
+    : `<div class="s-page-info" style="text-align:center;padding:6px 0;">${total} resultado${total!==1?'s':''}</div>`;
+
+  box.innerHTML = itemsHTML + paginationHTML;
+
+  // Scroll al inicio del panel al cambiar pagina
+  box.scrollTop = 0;
+
+  // Lazy load con IntersectionObserver
   box.querySelectorAll('img[data-src]').forEach(img => {
     const obs = new IntersectionObserver(entries => {
       entries.forEach(e => {
@@ -838,12 +896,16 @@ function _search() {
         const im = e.target;
         im.src = im.dataset.src;
         im.removeAttribute('data-src');
-        im.onload = () => im.classList.add('loaded');
         obs.unobserve(im);
       });
-    }, { rootMargin:'60px' });
+    }, { root: box, rootMargin: '80px' });
     obs.observe(img);
   });
+}
+
+function goSearchPage(page) {
+  searchPage = page;
+  renderSearchPage();
 }
 
 function pickSearch(i) {
