@@ -620,13 +620,13 @@ async function loadCatalog() {
 
     setLoad(100, `${products.length} productos cargados ✓`);
 
-    const savedSession  = localStorage.getItem('ds_session');
-    const savedUser     = localStorage.getItem('ds_session_user');
-    if (savedSession && savedUser === currentUser.username) {
+    // Restaurar sesion guardada de este usuario especificamente
+    const savedSession = localStorage.getItem(`ds_session_${currentUser.username}`);
+    if (savedSession) {
       try {
         session      = JSON.parse(savedSession);
-        sessionSaved = true; // viene guardada, no hay cambios pendientes
-      } catch(e) { localStorage.removeItem('ds_session'); }
+        sessionSaved = true;
+      } catch(e) { localStorage.removeItem(`ds_session_${currentUser.username}`); }
     }
 
     await delay(400);
@@ -894,9 +894,8 @@ function removeItem(idx) {
 ══════════════════════════════════════════════════════ */
 function saveSession() {
   if (!session.length) { toast('No hay artículos para guardar', 'warn'); return; }
-  // localStorage persiste entre dias y cierres del browser
-  localStorage.setItem('ds_session', JSON.stringify(session));
-  localStorage.setItem('ds_session_user', currentUser.username);
+  // Clave por usuario — cada usuario tiene su propia sesion guardada
+  localStorage.setItem(`ds_session_${currentUser.username}`, JSON.stringify(session));
   sessionSaved = true;
   toast('Sesion guardada - podes cerrar y continuar despues', 'ok');
 }
@@ -957,8 +956,7 @@ async function doExport() {
 
     session = [];
     sessionSaved = false;
-    localStorage.removeItem('ds_session');
-    localStorage.removeItem('ds_session_user');
+    localStorage.removeItem(`ds_session_${currentUser.username}`);
     sessionStorage.removeItem('ds_session');
     renderSession();
     beep('ok');
@@ -985,8 +983,7 @@ function confirmClear() {
       { label:'Cancelar', primary:false, action:closeModal },
       { label:'Limpiar',  primary:true,  action:() => {
         session = []; sessionSaved = false;
-        localStorage.removeItem('ds_session');
-        localStorage.removeItem('ds_session_user');
+        localStorage.removeItem(`ds_session_${currentUser.username}`);
         sessionStorage.removeItem('ds_session');
         renderSession(); closeModal(); toast('Sesion limpiada', 'info');
       }},
