@@ -399,6 +399,7 @@ let currentUser = null;   // { username, display }
 let products    = [];
 let session     = [];
 let currentP    = null;
+let sessionSaved = false; // true cuando la sesion fue guardada con saveSession()
 
 /* ══════════════════════════════════════════════════════
    API — llama a las Netlify Functions (sin PAT en el código)
@@ -514,8 +515,14 @@ async function loadCatalog() {
 
     setLoad(100, `${products.length} productos cargados ✓`);
 
-    const saved = sessionStorage.getItem('ds_session');
-    if (saved) { try { session = JSON.parse(saved); } catch(e){} }
+    const savedSession  = localStorage.getItem('ds_session');
+    const savedUser     = localStorage.getItem('ds_session_user');
+    if (savedSession && savedUser === currentUser.username) {
+      try {
+        session      = JSON.parse(savedSession);
+        sessionSaved = true; // viene guardada, no hay cambios pendientes
+      } catch(e) { localStorage.removeItem('ds_session'); }
+    }
 
     await delay(400);
     launchApp();
@@ -648,11 +655,12 @@ function addToSession() {
   if (existing) {
     existing.qty += qty;
     if (notes) existing.notes = notes;
-    toast(`+${qty} sumado → total: ${existing.qty}`, 'ok');
+    toast(`+${qty} sumado - total: ${existing.qty}`, 'ok');
   } else {
     session.push({ product: currentP, qty, notes });
-    toast(`${currentP.nombre} ×${qty}`, 'ok');
+    toast(`${currentP.nombre} x${qty}`, 'ok');
   }
+  sessionSaved = false; // nueva actividad: sesion desactualizada
   beep('add');
   renderSession();
 
@@ -780,8 +788,12 @@ function removeItem(idx) {
    SAVE SESSION
 ══════════════════════════════════════════════════════ */
 function saveSession() {
-  sessionStorage.setItem('ds_session', JSON.stringify(session));
-  toast('Sesión guardada', 'ok');
+  if (!session.length) { toast('No hay artículos para guardar', 'warn'); return; }
+  // localStorage persiste entre dias y cierres del browser
+  localStorage.setItem('ds_session', JSON.stringify(session));
+  localStorage.setItem('ds_session_user', currentUser.username);
+  sessionSaved = true;
+  toast('Sesion guardada - podes cerrar y continuar despues', 'ok');
 }
 
 /* ══════════════════════════════════════════════════════
@@ -839,10 +851,13 @@ async function doExport() {
     closeModal();
 
     session = [];
+    sessionSaved = false;
+    localStorage.removeItem('ds_session');
+    localStorage.removeItem('ds_session_user');
     sessionStorage.removeItem('ds_session');
     renderSession();
     beep('ok');
-    toast('Reporte subido correctamente ✓', 'ok');
+    toast('Reporte subido correctamente', 'ok');
 
   } catch(e) {
     document.getElementById('upWrap').classList.remove('visible');
@@ -864,8 +879,11 @@ function confirmClear() {
     [
       { label:'Cancelar', primary:false, action:closeModal },
       { label:'Limpiar',  primary:true,  action:() => {
-        session = []; sessionStorage.removeItem('ds_session');
-        renderSession(); closeModal(); toast('Sesión limpiada', 'info');
+        session = []; sessionSaved = false;
+        localStorage.removeItem('ds_session');
+        localStorage.removeItem('ds_session_user');
+        sessionStorage.removeItem('ds_session');
+        renderSession(); closeModal(); toast('Sesion limpiada', 'info');
       }},
     ]
   );
@@ -875,15 +893,19 @@ function confirmClear() {
    LOGOUT
 ══════════════════════════════════════════════════════ */
 function doLogout() {
-  showModal('CERRAR SESIÓN',
-    session.length
-      ? `Tenés <strong>${session.length}</strong> artículos sin exportar. Guardalos antes de salir.`
-      : '¿Cerrar sesión?',
+  const unsaved = session.length && !sessionSaved;
+  showModal('CERRAR SESION',
+    unsaved
+      ? `Tenes <strong>${session.length}</strong> articulos sin guardar. Guarda la sesion antes de salir para poder continuar despues.`
+      : session.length
+        ? 'La sesion esta guardada. Podes cerrar sesion y continuar despues.'
+        : 'Cerrar sesion?',
     [
-      { label:'Cancelar', primary:false, action:closeModal },
-      { label:'Salir',    primary:true,  action:() => {
+      { label: unsaved ? 'Volver y guardar' : 'Cancelar', primary:false, action:closeModal },
+      { label: 'Salir', primary:true, action:() => {
+        // NO borrar localStorage — la sesion guardada debe sobrevivir al logout
         sessionStorage.clear();
-        currentUser=null; products=[]; session=[]; currentP=null;
+        currentUser=null; products=[]; session=[]; currentP=null; sessionSaved=false;
         document.getElementById('inUser').value='';
         document.getElementById('inPass').value='';
         document.getElementById('loginErr').textContent='';
@@ -972,12 +994,13 @@ function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
    AUTO-RESTORE SESSION ON RELOAD
 ══════════════════════════════════════════════════════ */
 window.addEventListener('DOMContentLoaded', () => {
+  // Restaurar sesion de login (sessionStorage — solo mientras el browser esta abierto)
   const saved = sessionStorage.getItem('ds_user');
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
       showScreen('loading');
-      setLoad(5,'Restaurando sesión…');
+      setLoad(5,'Restaurando sesion...');
       loadCatalog();
     } catch(e) { sessionStorage.clear(); }
   }
