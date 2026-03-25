@@ -191,7 +191,44 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .s-page-btn:disabled{opacity:.3;cursor:not-allowed;}
 .s-page-info{font-family:var(--mono);font-size:10px;color:var(--t3);text-align:center;flex:1;}
 
-/* ── RIGHT PANEL ── */
+/* Boton agregar articulo manual */
+.btn-manual{width:100%;padding:9px;background:transparent;
+  border:1px dashed var(--border2);border-radius:var(--r);
+  color:var(--t2);font-family:var(--mono);font-size:10px;
+  text-transform:uppercase;letter-spacing:1px;
+  transition:var(--tr);cursor:pointer;margin-top:2px;}
+.btn-manual:hover{border-color:var(--accent);color:var(--accent);}
+
+/* Formulario articulo manual */
+.manual-form{flex-shrink:0;border-top:2px solid var(--accent);background:var(--s2);
+  padding:14px 16px;display:none;flex-direction:column;gap:10px;animation:fadeUp .2s ease;}
+.manual-form.visible{display:flex;}
+.manual-form-title{font-family:var(--disp);font-size:18px;letter-spacing:1px;
+  color:var(--accent);display:flex;align-items:center;justify-content:space-between;}
+.manual-form-close{background:none;border:none;color:var(--t3);font-size:16px;
+  cursor:pointer;padding:2px 6px;transition:var(--tr);}
+.manual-form-close:hover{color:var(--red);}
+.mrow{display:flex;gap:8px;}
+.mrow .fgroup{flex:1;}
+.manual-form .flabel{font-size:9px;}
+.manual-form .finput{padding:8px 10px;font-size:13px;background:var(--s3);border:1px solid var(--border);}
+.manual-form .finput:focus{border-color:var(--accent);}
+.manual-qty-row{display:flex;gap:8px;align-items:flex-end;}
+.manual-qty-row .fgroup{flex:1;}
+.manual-qty-input{width:100%;padding:9px 10px;background:var(--s3);border:2px solid var(--border);
+  border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:18px;font-weight:500;
+  text-align:center;outline:none;transition:var(--tr);}
+.manual-qty-input:focus{border-color:var(--accent);}
+.btn-manual-add{flex:2;padding:9px;background:var(--accent);border:none;border-radius:var(--r);
+  color:#0c0c0c;font-family:var(--disp);font-size:18px;letter-spacing:1px;
+  transition:var(--tr);cursor:pointer;}
+.btn-manual-add:hover{background:var(--acd);}
+.manual-note{width:100%;padding:7px 10px;height:38px;background:var(--s3);
+  border:1px solid var(--border);border-radius:var(--r);color:var(--text);
+  font-size:12px;resize:none;outline:none;font-family:var(--sans);transition:var(--tr);}
+.manual-note:focus{border-color:var(--b2);}
+.manual-note::placeholder{color:var(--t3);font-size:11px;}
+.manual-err{font-family:var(--mono);font-size:10px;color:var(--red);min-height:14px;}
 .panel-right{display:flex;flex-direction:column;background:var(--s1);overflow:hidden;}
 .pr-head{padding:14px 16px;border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
@@ -461,7 +498,50 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
             <input type="text" id="sSupp"  class="sinput" placeholder="Proveedor"      oninput="doSearch()">
           </div>
           <input type="text" id="sSku" class="sinput" placeholder="SKU" oninput="doSearch()">
+          <button class="btn-manual" onclick="toggleManualForm()">＋ Artículo no encontrado — ingresar manualmente</button>
         </div>
+
+        <!-- FORMULARIO MANUAL -->
+        <div class="manual-form" id="manualForm">
+          <div class="manual-form-title">
+            ARTÍCULO MANUAL
+            <button class="manual-form-close" onclick="toggleManualForm()" title="Cerrar">✕</button>
+          </div>
+          <div class="mrow">
+            <div class="fgroup">
+              <div class="flabel">Nombre *</div>
+              <input id="mNombre" class="finput" type="text" placeholder="Nombre del artículo">
+            </div>
+            <div class="fgroup">
+              <div class="flabel">SKU</div>
+              <input id="mSku" class="finput" type="text" placeholder="Código interno"
+                autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="fgroup">
+              <div class="flabel">Marca / Rubro</div>
+              <input id="mMarca" class="finput" type="text" placeholder="Marca">
+            </div>
+            <div class="fgroup">
+              <div class="flabel">Proveedor</div>
+              <input id="mProveedor" class="finput" type="text" placeholder="Proveedor">
+            </div>
+          </div>
+          <div class="manual-qty-row">
+            <div class="fgroup">
+              <div class="flabel">Cantidad *</div>
+              <input id="mQty" class="manual-qty-input" type="number" value="1" min="1" max="9999">
+            </div>
+            <div class="fgroup" style="flex:2;">
+              <div class="flabel">Notas</div>
+              <textarea id="mNotes" class="manual-note" placeholder="Observaciones opcionales…"></textarea>
+            </div>
+          </div>
+          <div class="manual-err" id="manualErr"></div>
+          <button class="btn-manual-add" onclick="addManualArticle()">AGREGAR A SESIÓN</button>
+        </div>
+
         <div class="search-results" id="searchResults">
           <div class="s-idle">
             <div class="s-idle-icon">🔍</div>
@@ -914,6 +994,77 @@ function pickSearch(i) {
 }
 
 /* ══════════════════════════════════════════════════════
+   ARTICULO MANUAL — para productos no encontrados
+══════════════════════════════════════════════════════ */
+function toggleManualForm() {
+  const form = document.getElementById('manualForm');
+  const open = form.classList.toggle('visible');
+  if (open) {
+    // Limpiar form al abrir
+    ['mNombre','mSku','mMarca','mProveedor','mNotes'].forEach(id =>
+      document.getElementById(id).value = ''
+    );
+    document.getElementById('mQty').value = 1;
+    document.getElementById('manualErr').textContent = '';
+    document.getElementById('mNombre').focus();
+  }
+}
+
+function addManualArticle() {
+  const nombre    = document.getElementById('mNombre').value.trim();
+  const sku       = document.getElementById('mSku').value.trim();
+  const marca     = document.getElementById('mMarca').value.trim();
+  const proveedor = document.getElementById('mProveedor').value.trim();
+  const qty       = Math.max(1, parseInt(document.getElementById('mQty').value) || 1);
+  const notes     = document.getElementById('mNotes').value.trim();
+  const errEl     = document.getElementById('manualErr');
+
+  // Unico campo obligatorio: nombre
+  if (!nombre) {
+    errEl.textContent = 'El nombre del artículo es obligatorio.';
+    document.getElementById('mNombre').focus();
+    return;
+  }
+  errEl.textContent = '';
+
+  // Construir producto manual con prefijo para identificarlo en el reporte
+  const producto = {
+    sku:       sku       || '—',
+    skuPadre:  '',
+    barcode:   '',
+    nombre:    nombre,
+    marca:     marca     || '—',
+    proveedor: proveedor || '—',
+    estado:    '',
+    imagen:    '',
+    _manual:   true,     // flag para el reporte
+  };
+
+  // Sumar a sesion (misma logica que scan: si existe, suma)
+  const existing = session.find(s =>
+    s.product._manual &&
+    s.product.nombre.toLowerCase() === nombre.toLowerCase() &&
+    s.product.sku === producto.sku
+  );
+
+  if (existing) {
+    existing.qty += qty;
+    if (notes) existing.notes = notes;
+    toast(`+${qty} sumado a "${nombre}" → total: ${existing.qty}`, 'ok');
+  } else {
+    session.push({ product: producto, qty, notes });
+    toast(`"${nombre}" agregado ×${qty}`, 'ok');
+  }
+
+  sessionSaved = false;
+  beep('add');
+  renderSession();
+
+  // Cerrar formulario y limpiar
+  document.getElementById('manualForm').classList.remove('visible');
+}
+
+/* ══════════════════════════════════════════════════════
    SESSION RENDER
 ══════════════════════════════════════════════════════ */
 function renderSession() {
@@ -927,21 +1078,32 @@ function renderSession() {
     list.innerHTML = '<div class="s-empty">Aún no hay artículos.<br>Escaneá o buscá un producto.</div>';
     return;
   }
-  list.innerHTML = session.map((item, idx) => `
-    <div class="si">
-      <div class="si-thumb">
-        ${item.product.imagen
-          ? `<img src="${esc(item.product.imagen)}" loading="lazy"
-               onerror="this.style.display='none'" onload="this.classList.add('loaded')">`
-          : '📦'}
-      </div>
+  list.innerHTML = session.map((item, idx) => {
+    const isManual = item.product._manual;
+    const thumb = item.product.imagen
+      ? `<img src="${esc(item.product.imagen)}" loading="lazy"
+             onerror="this.style.display='none'" onload="this.classList.add('loaded')">`
+      : isManual ? '✏️' : '📦';
+    const codeStr = isManual
+      ? [item.product.sku !== '—' ? item.product.sku : '', item.product.marca !== '—' ? item.product.marca : '']
+          .filter(Boolean).join(' · ') || 'Manual'
+      : (item.product.barcode || item.product.sku);
+    const notesStr = item.notes ? ' · ' + esc(item.notes) : '';
+    const manualBadge = isManual
+      ? `<span style="font-family:var(--mono);font-size:9px;color:var(--orange);
+           background:rgba(255,170,71,.1);border:1px solid rgba(255,170,71,.25);
+           padding:1px 5px;border-radius:3px;margin-left:4px;">MANUAL</span>`
+      : '';
+    return `<div class="si">
+      <div class="si-thumb">${thumb}</div>
       <div class="si-info">
-        <div class="si-name">${esc(item.product.nombre)}</div>
-        <div class="si-code">${item.product.barcode||item.product.sku}${item.notes?' · '+esc(item.notes):''}</div>
+        <div class="si-name">${esc(item.product.nombre)}${manualBadge}</div>
+        <div class="si-code">${codeStr}${notesStr}</div>
       </div>
       <div class="si-qty">${item.qty}</div>
       <button class="si-del" onclick="removeItem(${idx})">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function removeItem(idx) {
@@ -987,17 +1149,18 @@ async function doExport() {
     await delay(80);
 
     const rows = session.map(item => ({
-      'SKU':            item.product.sku,
+      'Origen':         item.product._manual ? 'MANUAL' : 'Catálogo',
+      'SKU':            item.product.sku !== '—' ? item.product.sku : '',
       'Código Barras':  item.product.barcode,
       'Nombre':         item.product.nombre,
-      'Rubro':          item.product.marca,
-      'Proveedor':      item.product.proveedor,
+      'Rubro':          item.product.marca !== '—' ? item.product.marca : '',
+      'Proveedor':      item.product.proveedor !== '—' ? item.product.proveedor : '',
       'Estado':         item.product.estado,
       'Cantidad':       item.qty,
       'Notas':          item.notes || '',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:14},{wch:16},{wch:30},{wch:16},{wch:20},{wch:12},{wch:10},{wch:28}];
+    ws['!cols'] = [{wch:10},{wch:14},{wch:16},{wch:30},{wch:16},{wch:20},{wch:12},{wch:10},{wch:28}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
     const b64 = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
