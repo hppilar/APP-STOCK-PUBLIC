@@ -248,6 +248,111 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(12,12,12,.3);
   border-top-color:#0c0c0c;border-radius:50%;animation:spin .6s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE — pantallas verticales (movil / tablet)
+   Breakpoint: ancho < 768px  O  orientacion portrait
+══════════════════════════════════════════════════════ */
+@media (max-width: 767px), (orientation: portrait) {
+
+  /* App ocupa altura completa con scroll vertical */
+  html, body { overflow: auto; }
+  #screenApp { height: auto; min-height: 100vh; overflow: auto; }
+
+  /* Header mas compacto */
+  .app-header { padding: 0 12px; height: 48px; }
+  .app-logo   { font-size: 20px; }
+  .hchip      { font-size: 9px; padding: 2px 7px; }
+  .btn-sm     { font-size: 9px; padding: 4px 8px; }
+
+  /* Layout vertical: izquierda arriba, derecha (sesion) abajo */
+  .app-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* Panel izquierdo: altura automatica */
+  .panel-left {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+    height: auto;
+  }
+
+  /* Tabs mas compactos */
+  .tab-btn { font-size: 9px; padding: 11px 6px; letter-spacing: 1px; }
+
+  /* Panel de scanner */
+  .scanner-zone { padding: 16px 14px 12px; }
+  .scan-label   { font-size: 9px; }
+  .scan-input   { font-size: 16px; padding: 13px 44px 13px 13px; }
+
+  /* Card de producto encontrado: imagen mas pequena */
+  .pf-img  { width: 80px; height: 80px; font-size: 22px; }
+  .pf-name { font-size: 13px; }
+  .pf-body { padding: 10px 12px; }
+  .pf-tags { gap: 4px; margin-bottom: 9px; }
+  .pf-tag  { font-size: 9px; }
+  .qty-input { width: 60px; font-size: 16px; }
+  .btn-add   { font-size: 16px; }
+  .notes-input { height: 38px; }
+
+  /* Zona de busqueda */
+  .search-zone { padding: 10px 12px; gap: 6px; }
+  .sinput      { font-size: 12px; padding: 8px 10px; }
+
+  /* Resultados de busqueda: altura fija con scroll */
+  .search-results { max-height: 340px; overflow-y: auto; }
+
+  /* Tabs panel: altura automatica */
+  .tab-panel { overflow: visible; height: auto; }
+  .tab-panel.active { display: flex; }
+
+  /* Panel derecho (sesion): debajo del izquierdo */
+  .panel-right {
+    height: auto;
+    min-height: 0;
+    border-top: 2px solid var(--border);
+    overflow: visible;
+  }
+
+  /* Lista de sesion: altura fija con scroll */
+  .session-list {
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  /* Footer de sesion */
+  .pr-footer { padding: 12px; gap: 7px; }
+  .btn-primary   { font-size: 18px; padding: 11px; }
+  .btn-secondary,
+  .btn-tertiary  { font-size: 9px; padding: 8px; }
+
+  /* Alerta inactivo */
+  .inactive-alert { margin: 0 14px 8px; font-size: 10px; }
+
+  /* Modal: ancho completo en mobile */
+  .modal { padding: 20px; }
+  .modal-title { font-size: 20px; }
+  .modal-body  { font-size: 12px; }
+
+  /* Toast: ancho casi completo */
+  #toast { max-width: 90vw; white-space: normal; text-align: center; }
+
+  /* Login: padding reducido */
+  #screenLogin { padding: 16px; }
+  .login-logo  { font-size: 40px; }
+  .login-card  { padding: 20px; }
+}
+
+/* Tablet portrait (768–1023px): layout de 2 columnas pero mas angosto */
+@media (min-width: 768px) and (max-width: 1023px) and (orientation: portrait) {
+  .app-body { grid-template-columns: 1fr 260px; }
+  .scan-input { font-size: 17px; }
+  .session-list { max-height: none; }
+}
 </style>
 </head>
 <body>
@@ -938,7 +1043,8 @@ function showModal(title, body, buttons) {
   document.getElementById('modalBg').classList.add('open');
 }
 function closeModal(e) {
-  if (e && e.target !== document.getElementById('modalBg')) return;
+  // Si viene de un click en el backdrop, solo cerrar si el click fue exactamente en el backdrop
+  if (e instanceof MouseEvent && e.target !== document.getElementById('modalBg')) return;
   document.getElementById('modalBg').classList.remove('open');
 }
 
